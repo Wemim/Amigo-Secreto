@@ -67,37 +67,34 @@ ul {
 }
 
 li {
-  background: #fff;
-  border: 1px solid #e6d8a8;
-  color: #5a4a2c;
   padding: 14px;
   margin-bottom: 10px;
   border-radius: 14px;
   cursor: pointer;
   font-size: 16px;
+  border: 1px solid #e6d8a8;
 }
 
-li:hover {
+li.nao-abriu {
   background: #fff7df;
 }
 
-input {
-  width: 100%;
-  padding: 14px;
-  border-radius: 14px;
-  border: 1px solid #d6c28a;
-  font-size: 16px;
-  margin-bottom: 10px;
+li.abriu {
+  background: #e8f5e9;
+  border-color: #81c784;
 }
 
-button {
+input, button {
   width: 100%;
   padding: 14px;
   border-radius: 14px;
   border: none;
-  font-size: 17px;
-  cursor: pointer;
+  font-size: 16px;
   margin-bottom: 10px;
+}
+
+input {
+  border: 1px solid #d6c28a;
 }
 
 .add {
@@ -113,12 +110,6 @@ button {
 .reset {
   background: #111;
   color: white;
-}
-
-@media (max-width: 480px) {
-  .container {
-    margin: 10px;
-  }
 }
 </style>
 </head>
@@ -142,8 +133,10 @@ button {
 <audio id="drawSound" src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3"></audio>
 
 <script>
+/* 🔐 SENHA ADM */
 const ADMIN_PASSWORD = "1234";
 
+/* 🔥 FIREBASE CONFIG (USE O SEU) */
 const firebaseConfig = {
     apiKey: "AIzaSyAoCPefKjU2dzTTdYdfQyJIzg0FUKndzOM",
     authDomain: "amigo-secreto-84eb6.firebaseapp.com",
@@ -163,81 +156,116 @@ const resetBtn = document.getElementById("resetBtn");
 const nameInput = document.getElementById("nameInput");
 const drawSound = document.getElementById("drawSound");
 
-let locked = false;
-
-/* STATUS */
+/* 🔄 STATUS GLOBAL */
 db.collection("config").doc("status").onSnapshot(doc => {
-  locked = doc.exists && doc.data().locked;
+  const locked = doc.exists && doc.data().locked === true;
 
   addBtn.style.display = locked ? "none" : "block";
   drawBtn.style.display = locked ? "none" : "block";
   nameInput.style.display = locked ? "none" : "block";
 });
 
-/* LISTA */
+/* 🔄 LISTA EM TEMPO REAL */
 db.collection("participants").onSnapshot(snapshot => {
   list.innerHTML = "";
   snapshot.forEach(doc => {
+    const data = doc.data();
     const li = document.createElement("li");
     li.textContent = "✨ " + doc.id;
-    li.onclick = () => openParticipant(doc.id, doc.data());
+    li.className = data.opened ? "abriu" : "nao-abriu";
+    li.onclick = () => openParticipant(doc.id, data);
     list.appendChild(li);
   });
 });
 
-/* ADD */
+/* ➕ ADICIONAR */
 async function addName() {
   const name = nameInput.value.trim();
   if (!name) return;
 
   const ref = db.collection("participants").doc(name);
-  if ((await ref.get()).exists) return alert("Nome já existe!");
+  if ((await ref.get()).exists) {
+    alert("Nome já existe!");
+    return;
+  }
 
-  await ref.set({ drawn: "", password: "" });
+  await ref.set({
+    drawn: "",
+    password: "",
+    opened: false
+  });
+
   nameInput.value = "";
 }
 
-/* DRAW */
+/* 🎲 SORTEAR (SEM AUTO-SORTEIO) */
 async function drawNames() {
   const snap = await db.collection("participants").get();
   const names = snap.docs.map(d => d.id);
-  if (names.length < 2) return alert("Mínimo 2 participantes");
+
+  if (names.length < 2) {
+    alert("Mínimo 2 participantes");
+    return;
+  }
+
+  let shuffled, valido = false;
+
+  while (!valido) {
+    shuffled = [...names].sort(() => Math.random() - 0.5);
+    valido = true;
+    for (let i = 0; i < names.length; i++) {
+      if (names[i] === shuffled[i]) {
+        valido = false;
+        break;
+      }
+    }
+  }
 
   drawSound.play();
 
-  const shuffled = [...names].sort(() => Math.random() - 0.5);
   for (let i = 0; i < names.length; i++) {
-    await db.collection("participants").doc(names[i])
-      .update({ drawn: shuffled[(i + 1) % shuffled.length] });
+    await db.collection("participants")
+      .doc(names[i])
+      .update({ drawn: shuffled[i] });
   }
 
   await db.collection("config").doc("status").set({ locked: true });
   alert("🎉 Sorteio realizado!");
 }
 
-/* VIEW */
+/* 🔐 VER AMIGO */
 function openParticipant(name, data) {
-  if (!data.drawn) return alert("Sorteio ainda não feito.");
+  if (!data.drawn) {
+    alert("Sorteio ainda não foi feito.");
+    return;
+  }
 
   const pass = prompt(data.password ? "Digite sua senha:" : "Crie uma senha:");
   if (!pass) return;
 
   if (!data.password) {
-    db.collection("participants").doc(name).update({ password: pass });
+    db.collection("participants").doc(name).update({
+      password: pass,
+      opened: true
+    });
     alert("🎁 Seu amigo secreto é: " + data.drawn);
   } else if (pass === data.password) {
+    db.collection("participants").doc(name).update({ opened: true });
     alert("🎁 Seu amigo secreto é: " + data.drawn);
   } else {
     alert("Senha incorreta!");
   }
 }
 
-/* RESET */
+/* 🔴 RESET */
 async function resetAll() {
   const pass = prompt("Senha ADM:");
-  if (pass !== ADMIN_PASSWORD) return alert("Senha incorreta!");
+  if (pass !== ADMIN_PASSWORD) {
+    alert("Senha incorreta!");
+    return;
+  }
 
-  if (!confirm("Deseja apagar tudo?")) return;
+  if (!confirm("Deseja apagar todo o sorteio?")) return;
 
   const snap = await db.collection("participants").get();
   for (const d of snap.docs) await d.ref.delete();
