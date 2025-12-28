@@ -2,6 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🎁 Amigo Secreto</title>
 
 <!-- Firebase -->
@@ -9,73 +10,98 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
+*{box-sizing:border-box;}
+
 body{
   margin:0;
   min-height:100vh;
-  background:url("https://images.unsplash.com/photo-1544025162-d76694265947") center/cover;
+  background:url("https://images.unsplash.com/photo-1544025162-d76694265947") center/cover no-repeat;
   font-family: Arial, sans-serif;
 }
+
 .overlay{
   background:rgba(0,0,0,.6);
   min-height:100vh;
+  padding:20px;
   display:flex;
   justify-content:center;
-  align-items:center;
+  align-items:flex-start;
 }
+
 .card{
   background:#fff;
   width:100%;
   max-width:420px;
   padding:20px;
-  border-radius:15px;
+  border-radius:16px;
 }
+
 h1{
   text-align:center;
   color:#bfa046;
+  margin:0 0 12px;
 }
+
+/* LISTA */
 ul{
   list-style:none;
   padding:0;
+  margin:0;
+  max-height:55vh;
+  overflow-y:auto;
 }
+
 li{
-  padding:10px;
-  margin-top:6px;
+  padding:12px;
+  margin-top:8px;
   background:#f4f4f4;
-  border-radius:8px;
+  border-radius:10px;
   cursor:pointer;
+  font-size:16px;
 }
+
 li.viewed{
   background:#efe2a0;
 }
+
+/* ADM PANEL */
+#admPanel{
+  display:none;
+  margin-top:15px;
+  border-top:1px solid #ddd;
+  padding-top:12px;
+}
+
 input,button{
   width:100%;
-  padding:10px;
+  padding:12px;
   margin-top:8px;
-  border-radius:8px;
+  border-radius:10px;
   border:1px solid #ccc;
+  font-size:15px;
 }
+
 button{
   background:#d4af37;
   border:none;
   font-weight:bold;
   cursor:pointer;
 }
+
 button:hover{opacity:.9}
 
+/* BOTÃO ADM FLUTUANTE */
 #admBtn{
   position:fixed;
-  bottom:15px;
-  right:15px;
-  width:auto;
-  padding:12px;
+  bottom:18px;
+  right:18px;
+  width:48px;
+  height:48px;
   border-radius:50%;
-}
-
-#admPanel{
-  display:none;
-  margin-top:15px;
-  border-top:1px solid #ddd;
-  padding-top:10px;
+  background:#d4af37;
+  border:none;
+  font-size:18px;
+  cursor:pointer;
 }
 </style>
 </head>
@@ -85,7 +111,7 @@ button:hover{opacity:.9}
   <div class="card">
     <h1>🎄 Amigo Secreto</h1>
 
-    <!-- LISTA VISÍVEL PRA TODOS -->
+    <!-- LISTA -->
     <ul id="list"></ul>
 
     <!-- PAINEL ADM -->
@@ -101,34 +127,32 @@ button:hover{opacity:.9}
 <button id="admBtn" onclick="openAdm()">⚙️</button>
 
 <script>
-/* 🔐 SENHA DO ADMIN */
-const ADMIN_PASSWORD = "1234";
+const ADMIN_PASSWORD="1234";
 
-/* 🔥 FIREBASE CONFIG (JÁ INSERIDO) */
-const firebaseConfig = {
-  apiKey: "AIzaSyAoCPefKjU2dzTTdYdfQyJIzg0FUKndzOM",
-  authDomain: "amigo-secreto-84eb6.firebaseapp.com",
-  projectId: "amigo-secreto-84eb6",
-  storageBucket: "amigo-secreto-84eb6.appspot.com",
-  messagingSenderId: "778511384024",
-  appId: "1:778511384024:web:3d8b1c332e6108db8206ad"
+/* Firebase */
+const firebaseConfig={
+  apiKey:"AIzaSyAoCPefKjU2dzTTdYdfQyJIzg0FUKndzOM",
+  authDomain:"amigo-secreto-84eb6.firebaseapp.com",
+  projectId:"amigo-secreto-84eb6",
+  storageBucket:"amigo-secreto-84eb6.appspot.com",
+  messagingSenderId:"778511384024",
+  appId:"1:778511384024:web:3d8b1c332e6108db8206ad"
 };
-
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db=firebase.firestore();
 
-const list = document.getElementById("list");
-const nameInput = document.getElementById("nameInput");
-const admPanel = document.getElementById("admPanel");
+const list=document.getElementById("list");
+const nameInput=document.getElementById("nameInput");
+const admPanel=document.getElementById("admPanel");
 
-let locked = false;
+let locked=false;
 
-/* 🔒 STATUS GLOBAL */
+/* Status */
 db.collection("config").doc("status").onSnapshot(doc=>{
-  locked = doc.exists && doc.data().locked === true;
+  locked=doc.exists && doc.data().locked===true;
 });
 
-/* 🔄 LISTA EM TEMPO REAL */
+/* Lista */
 db.collection("participants").onSnapshot(snapshot=>{
   list.innerHTML="";
   snapshot.forEach(doc=>{
@@ -140,18 +164,17 @@ db.collection("participants").onSnapshot(snapshot=>{
   });
 });
 
-/* 🔐 ABRIR PAINEL ADM */
+/* ADM */
 function openAdm(){
   const pass=prompt("Senha ADM:");
   if(pass===ADMIN_PASSWORD){
     admPanel.style.display="block";
-    alert("Painel ADM liberado");
   }else{
     alert("Senha incorreta");
   }
 }
 
-/* ➕ ADICIONAR NOME */
+/* Add */
 async function addName(){
   if(locked){alert("Sorteio já realizado");return;}
   const name=nameInput.value.trim();
@@ -159,29 +182,20 @@ async function addName(){
 
   const ref=db.collection("participants").doc(name);
   if((await ref.get()).exists){
-    alert("Esse nome já existe");
-    return;
+    alert("Nome já existe");return;
   }
 
-  await ref.set({
-    drawn:"",
-    password:"",
-    viewed:false
-  });
-
+  await ref.set({drawn:"",password:"",viewed:false});
   nameInput.value="";
 }
 
-/* 🎲 SORTEAR (SEM PEGAR A SI MESMO) */
+/* Draw */
 async function drawNames(){
-  if(locked){alert("Sorteio já feito");return;}
+  if(locked){alert("Já sorteado");return;}
 
   const snap=await db.collection("participants").get();
   const names=snap.docs.map(d=>d.id);
-  if(names.length<2){
-    alert("Mínimo 2 participantes");
-    return;
-  }
+  if(names.length<2){alert("Mínimo 2");return;}
 
   let shuffled,ok=false;
   while(!ok){
@@ -199,19 +213,14 @@ async function drawNames(){
   }
 
   await db.collection("config").doc("status").set({locked:true});
-  alert("🎉 Sorteio realizado com sucesso!");
+  alert("🎉 Sorteio realizado!");
 }
 
-/* 👀 VER AMIGO SECRETO */
+/* Open */
 function openParticipant(name,data){
-  if(!data.drawn){
-    alert("Sorteio ainda não realizado");
-    return;
-  }
+  if(!data.drawn){alert("Ainda não sorteado");return;}
 
-  const pass=prompt(
-    data.password ? "Digite sua senha:" : "Crie uma senha:"
-  );
+  const pass=prompt(data.password?"Digite sua senha":"Crie uma senha:");
   if(!pass)return;
 
   if(!data.password){
@@ -228,17 +237,14 @@ function openParticipant(name,data){
   }
 }
 
-/* 🔴 RESET ADM */
+/* Reset */
 async function resetAll(){
-  if(!confirm("Isso apagará tudo. Continuar?"))return;
+  if(!confirm("Apagar tudo?"))return;
 
   const snap=await db.collection("participants").get();
-  for(const d of snap.docs){
-    await d.ref.delete();
-  }
-
+  for(const d of snap.docs){await d.ref.delete();}
   await db.collection("config").doc("status").set({locked:false});
-  alert("Sistema resetado");
+  alert("Reset feito");
 }
 </script>
 </body>
