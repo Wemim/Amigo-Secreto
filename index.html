@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>✨ Amigo Secreto</title>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Arial, sans-serif;
+  background-image: url("https://images.unsplash.com/photo-1543589077-47d81606c1bf");
+  background-size: cover;
+  background-position: center;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.55);
+}
+
+.container {
+  position: relative;
+  background: rgba(255,255,255,0.95);
+  width: 100%;
+  max-width: 420px;
+  padding: 22px;
+  border-radius: 20px;
+  box-shadow: 0 0 25px rgba(212,175,55,0.6);
+  animation: glow 3s infinite alternate;
+  z-index: 1;
+}
+
+@keyframes glow {
+  from { box-shadow: 0 0 15px rgba(212,175,55,0.4); }
+  to { box-shadow: 0 0 35px rgba(212,175,55,0.9); }
+}
+
+h1 {
+  text-align: center;
+  color: #b89b5e;
+  margin-bottom: 6px;
+}
+
+.subtitle {
+  text-align: center;
+  font-size: 14px;
+  color: #555;
+  margin-bottom: 18px;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 18px 0;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+li {
+  background: #fff;
+  border: 1px solid #e6d8a8;
+  color: #5a4a2c;
+  padding: 14px;
+  margin-bottom: 10px;
+  border-radius: 14px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+li:hover {
+  background: #fff7df;
+}
+
+input {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid #d6c28a;
+  font-size: 16px;
+  margin-bottom: 10px;
+}
+
+button {
+  width: 100%;
+  padding: 14px;
+  border-radius: 14px;
+  border: none;
+  font-size: 17px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.add {
+  background: linear-gradient(135deg, #d4af37, #b89b5e);
+  color: white;
+}
+
+.draw {
+  background: linear-gradient(135deg, #c9a227, #a88b3d);
+  color: white;
+}
+
+.reset {
+  background: #111;
+  color: white;
+}
+
+@media (max-width: 480px) {
+  .container {
+    margin: 10px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="overlay"></div>
+
+<div class="container">
+  <h1>🎁 Amigo Secreto</h1>
+  <div class="subtitle">Toque no seu nome para ver quem você tirou</div>
+
+  <ul id="list"></ul>
+
+  <input id="nameInput" placeholder="Nome do participante">
+  <button class="add" id="addBtn" onclick="addName()">➕ Adicionar</button>
+  <button class="draw" id="drawBtn" onclick="drawNames()">🎲 Sortear</button>
+  <button class="reset" id="resetBtn" onclick="resetAll()">🔒 Reset (ADM)</button>
+</div>
+
+<audio id="drawSound" src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3"></audio>
+
+<script>
+const ADMIN_PASSWORD = "1234";
+
+const firebaseConfig = {
+    apiKey: "AIzaSyAoCPefKjU2dzTTdYdfQyJIzg0FUKndzOM",
+    authDomain: "amigo-secreto-84eb6.firebaseapp.com",
+    projectId: "amigo-secreto-84eb6",
+    storageBucket: "amigo-secreto-84eb6.appspot.com",
+    messagingSenderId: "778511384024",
+    appId: "1:778511384024:web:3d8b1c332e6108db8206ad"
+  };
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const list = document.getElementById("list");
+const addBtn = document.getElementById("addBtn");
+const drawBtn = document.getElementById("drawBtn");
+const resetBtn = document.getElementById("resetBtn");
+const nameInput = document.getElementById("nameInput");
+const drawSound = document.getElementById("drawSound");
+
+let locked = false;
+
+/* STATUS */
+db.collection("config").doc("status").onSnapshot(doc => {
+  locked = doc.exists && doc.data().locked;
+
+  addBtn.style.display = locked ? "none" : "block";
+  drawBtn.style.display = locked ? "none" : "block";
+  nameInput.style.display = locked ? "none" : "block";
+});
+
+/* LISTA */
+db.collection("participants").onSnapshot(snapshot => {
+  list.innerHTML = "";
+  snapshot.forEach(doc => {
+    const li = document.createElement("li");
+    li.textContent = "✨ " + doc.id;
+    li.onclick = () => openParticipant(doc.id, doc.data());
+    list.appendChild(li);
+  });
+});
+
+/* ADD */
+async function addName() {
+  const name = nameInput.value.trim();
+  if (!name) return;
+
+  const ref = db.collection("participants").doc(name);
+  if ((await ref.get()).exists) return alert("Nome já existe!");
+
+  await ref.set({ drawn: "", password: "" });
+  nameInput.value = "";
+}
+
+/* DRAW */
+async function drawNames() {
+  const snap = await db.collection("participants").get();
+  const names = snap.docs.map(d => d.id);
+  if (names.length < 2) return alert("Mínimo 2 participantes");
+
+  drawSound.play();
+
+  const shuffled = [...names].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < names.length; i++) {
+    await db.collection("participants").doc(names[i])
+      .update({ drawn: shuffled[(i + 1) % shuffled.length] });
+  }
+
+  await db.collection("config").doc("status").set({ locked: true });
+  alert("🎉 Sorteio realizado!");
+}
+
+/* VIEW */
+function openParticipant(name, data) {
+  if (!data.drawn) return alert("Sorteio ainda não feito.");
+
+  const pass = prompt(data.password ? "Digite sua senha:" : "Crie uma senha:");
+  if (!pass) return;
+
+  if (!data.password) {
+    db.collection("participants").doc(name).update({ password: pass });
+    alert("🎁 Seu amigo secreto é: " + data.drawn);
+  } else if (pass === data.password) {
+    alert("🎁 Seu amigo secreto é: " + data.drawn);
+  } else {
+    alert("Senha incorreta!");
+  }
+}
+
+/* RESET */
+async function resetAll() {
+  const pass = prompt("Senha ADM:");
+  if (pass !== ADMIN_PASSWORD) return alert("Senha incorreta!");
+
+  if (!confirm("Deseja apagar tudo?")) return;
+
+  const snap = await db.collection("participants").get();
+  for (const d of snap.docs) await d.ref.delete();
+
+  await db.collection("config").doc("status").set({ locked: false });
+  alert("Sistema resetado!");
+}
+</script>
+
+</body>
+</html>
